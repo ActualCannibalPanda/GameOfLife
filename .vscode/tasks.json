@@ -6,7 +6,7 @@
         {
             "label": "Run Game",
             "type": "shell",
-            "command": "${cwd}/build/FPS"
+            "command": "${cwd}/build/GameOfLife"
         }
     ]
 }
