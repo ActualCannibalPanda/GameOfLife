@@ -1,35 +1,39 @@
-#include "raylib.h"
-#include "rcamera.h"
+#include <raylib.h>
 
-typedef struct CameraSettings {
-    Vector2 sensitivity;
-    Vector3 speed;
-} CameraSettings;
+#include <math.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <time.h>
+
+size_t MAP_WIDTH = 32;
+size_t MAP_HEIGHT = 32;
+size_t TILE_WIDTH = 32;
+size_t TILE_HEIGHT = 32;
 
 typedef struct Game {
-    Camera camera;
-    CameraSettings cameraSettings;
+    Camera2D camera;
+    int screenWidth;
+    int screenHeight;
+    int seed;
+    float mapScale;
+    bool *map;
 } Game;
 
+void InitGame(Game *game, int screenWidth, int screenHeight);
 void Update(Game *game);
 void Draw(Game *game);
+void DeinitGame(Game *game);
 
 int main(void) {
     const int screenWidth = 800;
     const int screenHeight = 450;
 
+    srand((unsigned int)time(NULL));
+
     InitWindow(screenWidth, screenHeight, "FPS");
 
     Game game = {0};
-    game.camera.position = (Vector3){0.0f, 2.0f, 4.0f};
-    game.camera.target = (Vector3){0.0f, 2.0f, 0.0f};
-    game.camera.up = (Vector3){0.0f, 1.0f, 0.0f};
-    game.camera.fovy = 60.0f;
-    game.camera.projection = CAMERA_PERSPECTIVE;
-    game.cameraSettings.sensitivity = (Vector2){0.1f, 0.1f};
-    game.cameraSettings.speed = (Vector3){0.2f, 0.2f, 0.2f};
-
-    DisableCursor();
+    InitGame(&game, screenWidth, screenHeight);
 
     SetTargetFPS(60);
 
@@ -43,38 +47,83 @@ int main(void) {
     return 0;
 }
 
+void InitGame(Game *game, int screenWidth, int screenHeight) {
+    game->screenWidth = screenWidth;
+    game->screenHeight = screenHeight;
+
+    float ratio = (float)GetScreenHeight() / (float)GetScreenWidth();
+
+    int mapWidth = TILE_WIDTH * MAP_WIDTH;
+    int mapHeight = TILE_HEIGHT * MAP_HEIGHT;
+
+    game->camera.target = (Vector2){mapWidth / 2.0f, mapHeight / 2.0f};
+    game->camera.offset = (Vector2){screenWidth / 2.0f, screenHeight / 2.0f};
+    game->camera.rotation = 0.0f;
+    game->camera.zoom =
+        (float)GetScreenHeight() / (float)(TILE_HEIGHT * MAP_HEIGHT);
+
+    game->map = (bool *)malloc(MAP_WIDTH * MAP_HEIGHT * sizeof(bool));
+    game->mapScale = 1.0f;
+    game->seed = rand();
+
+    srand(game->seed);
+    for (size_t x = 0; x < MAP_WIDTH; ++x) {
+        for (size_t y = 0; y < MAP_HEIGHT; ++y) {
+            if ((float)rand() / (float)RAND_MAX < 0.2) {
+                game->map[x * MAP_WIDTH + y] = true;
+            } else {
+                game->map[x * MAP_WIDTH + y] = false;
+            }
+            // game->map[x * MAP_WIDTH + y] = (x + y) % 2 == 0;
+        }
+    }
+}
+
 void Update(Game *game) {
-    UpdateCameraPro(
-        &game->camera,
-        (Vector3){
-            IsKeyDown(KEY_W) * game->cameraSettings.speed.z -
-                IsKeyDown(KEY_S) *
-                    game->cameraSettings.speed.z, // forward and back
-            IsKeyDown(KEY_D) * game->cameraSettings.speed.x -
-                IsKeyDown(KEY_A) *
-                    game->cameraSettings.speed.x, // right and left
-            0.0f                                  // up and down
-        },
-        (Vector3){GetMouseDelta().x * game->cameraSettings.sensitivity.x,
-                  GetMouseDelta().y * game->cameraSettings.sensitivity.y, 0.0f},
-        0.0f);
+    if (IsKeyDown(KEY_UP)) {
+        game->camera.zoom = expf(logf(game->camera.zoom) + 0.01f);
+    }
+    if (IsKeyDown((KEY_DOWN))) {
+        game->camera.zoom = expf(logf(game->camera.zoom) - 0.01f);
+    }
+
+    if (IsKeyDown(KEY_W)) {
+        game->camera.target.y += 5.0f;
+    }
+    if (IsKeyDown(KEY_S)) {
+        game->camera.target.y -= 5.0f;
+    }
+
+    if (IsKeyDown(KEY_A)) {
+        game->camera.target.x += 5.0f;
+    }
+    if (IsKeyDown(KEY_D)) {
+        game->camera.target.x -= 5.0f;
+    }
 }
 
 void Draw(Game *game) {
     BeginDrawing();
 
-    ClearBackground(RAYWHITE);
+    ClearBackground(BLACK);
 
-    BeginMode3D(game->camera);
-    DrawPlane((Vector3){0.0f, 0.0f, 0.0f}, (Vector2){32.0f, 32.0f},
-              LIGHTGRAY); // Draw ground
-    DrawCube((Vector3){-16.0f, 2.5f, 0.0f}, 1.0f, 5.0f, 32.0f,
-             BLUE); // Draw a blue wall
-    DrawCube((Vector3){16.0f, 2.5f, 0.0f}, 1.0f, 5.0f, 32.0f,
-             LIME); // Draw a green wall
-    DrawCube((Vector3){0.0f, 2.5f, 16.0f}, 32.0f, 5.0f, 1.0f,
-             GOLD); // Draw a yellow wall
-    EndMode3D();
+    BeginMode2D(game->camera);
+
+    float ratio = (float)GetScreenHeight() / (float)GetScreenWidth();
+
+    int width = TILE_WIDTH * game->mapScale;
+    int height = TILE_HEIGHT * game->mapScale;
+
+    // DrawRectangle(0, 0, width * MAP_WIDTH, height * MAP_HEIGHT, BLACK);
+    for (size_t x = 0; x < MAP_WIDTH; ++x) {
+        for (size_t y = 0; y < MAP_HEIGHT; ++y) {
+            if (game->map[x * MAP_WIDTH + y]) {
+                DrawRectangle(x * width, y * height, width, height, GREEN);
+            }
+        }
+    }
+
+    EndMode2D();
 
     EndDrawing();
 }
