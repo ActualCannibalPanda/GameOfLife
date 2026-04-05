@@ -42,6 +42,7 @@ int main(void) {
         Draw(&game);
     }
 
+    DeinitGame(&game);
     CloseWindow();
 
     return 0;
@@ -126,4 +127,11 @@ void Draw(Game *game) {
     EndMode2D();
 
     EndDrawing();
+}
+
+void DeinitGame(Game *game) {
+    if (game->map != NULL) {
+        free(game->map);
+        game->map = NULL;
+    }
 }
